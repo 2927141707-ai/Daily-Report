@@ -53,3 +53,42 @@ make -j1
 6、ORB-SLAM3 编译前的兼容处理
 
 7、编译 ORB-SLAM3
+
+8、编译器成功后的验证
+
+9、运行前检查
+
+***10、数据集运行示例
+命令与网址有些不同
+
+10.1先下载一段测试序列
+
+mkdir -p ~/slam/datasets
+cd ~/slam/datasets
+
+wget -c --tries=10 --timeout=30 \
+  https://cvg.cit.tum.de/rgbd/dataset/freiburg1/rgbd_dataset_freiburg1_xyz.tgz
+
+下载完成后执行：
+
+tar -xzf rgbd_dataset_freiburg1_xyz.tgz
+
+在终端执行
+
+mkdir -p ~/slam/results/tum_rgbd
+cd ~/slam/results/tum_rgbd
+
+~/slam/ORB_SLAM3/Examples/RGB-D/rgbd_tum \
+  ~/slam/ORB_SLAM3/Vocabulary/ORBvoc.txt \
+  ~/slam/ORB_SLAM3/Examples/RGB-D/TUM1.yaml \
+  ~/slam/datasets/rgbd_dataset_freiburg1_xyz \
+  ~/slam/ORB_SLAM3/Examples/RGB-D/associations/fr1_xyz.txt
+
+检查：
+  
+ls -lh ~/slam/results/tum_rgbd/
+
+应生成：
+  
+CameraTrajectory.txt：相机轨迹。
+KeyFrameTrajectory.txt：关键帧轨迹。
