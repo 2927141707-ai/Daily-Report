@@ -92,3 +92,7 @@ ls -lh ~/slam/results/tum_rgbd/
   
 CameraTrajectory.txt：相机轨迹。
 KeyFrameTrajectory.txt：关键帧轨迹。
+
+11、codex生成启动脚本
+
+bash /home/wmy/Documents/Codex/2026-11-06/rgb-d-orb-slam2-3/outputs/start_slam3.sh
