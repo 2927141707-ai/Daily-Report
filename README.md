@@ -26,6 +26,7 @@ libepoxy-dev libopencv-dev libeigen3-dev \
 libboost-serialization-dev libssl-dev
 
 2.1 OpenCV安装
+
 2.2 Eigen安装
 
 3、源码获取
@@ -46,7 +47,9 @@ cmake .. \
 make -j1
 
 4、旧 Pangolin 的清理（若曾装过其他版本参照网址执行，若没有安装过直接跳过）
+
 5、处理 OpenCV 遗留问题（若曾装过其他版本参照网址执行，若没有安装过直接跳过）
 
 6、ORB-SLAM3 编译前的兼容处理
+
 7、编译 ORB-SLAM3
