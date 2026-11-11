@@ -1,4 +1,4 @@
-# 2026年11月11日 ORB-SLAM3在Ubuntu24.04下的安装和运行、用奥比中光Gemini 2L RGB-D相机实现稠密建图
+# 2026年11月11日 ORB-SLAM3在Ubuntu24.04下的安装和运行、用奥比中光Gemini 2L RGB-D相机建图
 主要参照https://qd127.github.io/qdblog/2026/04/18/ORB-SLAM3/
 有部分步骤跳过或增添。
 
