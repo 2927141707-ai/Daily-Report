@@ -1,0 +1,238 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -12,21 +12,9 @@
+ set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -march=native")
+ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
+ 
+-# Check C++11 or C++0x support
+-include(CheckCXXCompilerFlag)
+-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+-CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+-if(COMPILER_SUPPORTS_CXX11)
+-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+-   add_definitions(-DCOMPILEDWITHC11)
+-   message(STATUS "Using flag -std=c++11.")
+-elseif(COMPILER_SUPPORTS_CXX0X)
+-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+-   add_definitions(-DCOMPILEDWITHC0X)
+-   message(STATUS "Using flag -std=c++0x.")
+-else()
+-   message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+-endif()
++set(CMAKE_CXX_STANDARD 17)
++set(CMAKE_CXX_STANDARD_REQUIRED ON)
++add_definitions(-DCOMPILEDWITHC11 -DEIGEN_MAX_ALIGN_BYTES=16 -DEIGEN_MAX_STATIC_ALIGN_BYTES=16)
+ 
+ LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
+ 
+@@ -113,7 +101,7 @@
+ include/Config.h
+ include/Settings.h)
+ 
+-add_subdirectory(Thirdparty/g2o)
++# g2o already built; link its existing library
+ 
+ target_link_libraries(${PROJECT_NAME}
+ ${OpenCV_LIBS}
+--- a/Thirdparty/Sophus/CMakeLists.txt
++++ b/Thirdparty/Sophus/CMakeLists.txt
+@@ -16,11 +16,11 @@
+ IF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    SET(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g")
+    SET(CMAKE_CXX_FLAGS_RELEASE "-O3")
+-   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wextra  -Wno-deprecated-register -Qunused-arguments -fcolor-diagnostics")
++   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -Wextra  -Wno-deprecated-register -Qunused-arguments -fcolor-diagnostics")
+ ELSEIF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    SET(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g")
+    SET(CMAKE_CXX_FLAGS_RELEASE "-O3")
+-   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wextra -std=c++11 -Wno-deprecated-declarations -ftemplate-backtrace-limit=0")
++   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -Wextra -std=c++11 -Wno-deprecated-declarations -ftemplate-backtrace-limit=0")
+    SET(CMAKE_CXX_FLAGS_COVERAGE "${CMAKE_CXX_FLAGS_DEBUG} --coverage -fno-inline -fno-inline-small-functions -fno-default-inline")
+    SET(CMAKE_EXE_LINKER_FLAGS_COVERAGE "${CMAKE_EXE_LINKER_FLAGS_DEBUG} --coverage")
+    SET(CMAKE_SHARED_LINKER_FLAGS_COVERAGE "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} --coverage")
+--- a/include/LoopClosing.h
++++ b/include/LoopClosing.h
+@@ -223,7 +223,7 @@
+     bool mbFixScale;
+ 
+ 
+-    bool mnFullBAIdx;
++    int mnFullBAIdx;
+ 
+ 
+ 
+--- a/include/System.h
++++ b/include/System.h
+@@ -174,6 +174,24 @@
+     // Information from most recent processed frame
+     // You can call this right after TrackMonocular (or stereo or RGBD)
+     int GetTrackingState();
++    // Value-only dense reconstruction interface. Invoke on the same owner thread
++    // as TrackRGBD/Reset (or after Shutdown), never concurrently with them.
++    struct DenseKeyFrame {
++        unsigned long id, frame_id;
++        double timestamp;
++        Sophus::SE3f Twc;
++    };
++    struct DenseMap {
++        unsigned long id;
++        int change_index;
++        std::vector<DenseKeyFrame> keyframes;
++    };
++    struct DenseSnapshot {
++        unsigned long active_map;
++        std::vector<DenseMap> maps;
++    };
++    bool GetCurrentDenseKeyFrame(DenseKeyFrame& frame);
++    DenseSnapshot GetDenseSnapshot();
+     std::vector<MapPoint*> GetTrackedMapPoints();
+     std::vector<cv::KeyPoint> GetTrackedKeyPointsUn();
+ 
+--- a/src/Atlas.cc
++++ b/src/Atlas.cc
+@@ -259,6 +259,7 @@
+ 
+ void Atlas::SetMapBad(Map* pMap)
+ {
++    unique_lock<mutex> lock(mMutexAtlas);
+     mspMaps.erase(pMap);
+     pMap->SetBad();
+ 
+@@ -267,6 +268,7 @@
+ 
+ void Atlas::RemoveBadMaps()
+ {
++    unique_lock<mutex> lock(mMutexAtlas);
+     /*for(Map* pMap : mspBadMaps)
+     {
+         delete pMap;
+--- a/src/System.cc
++++ b/src/System.cc
+@@ -521,29 +521,16 @@
+ 
+     cout << "Shutdown" << endl;
+ 
++    // Complete background work before the ROS node destroys this System.
+     mpLocalMapper->RequestFinish();
+     mpLoopCloser->RequestFinish();
+-    /*if(mpViewer)
+-    {
+-        mpViewer->RequestFinish();
+-        while(!mpViewer->isFinished())
+-            usleep(5000);
+-    }*/
+-
+-    // Wait until all thread have effectively stopped
+-    /*while(!mpLocalMapper->isFinished() || !mpLoopCloser->isFinished() || mpLoopCloser->isRunningGBA())
+-    {
+-        if(!mpLocalMapper->isFinished())
+-            cout << "mpLocalMapper is not finished" << endl;*/
+-        /*if(!mpLoopCloser->isFinished())
+-            cout << "mpLoopCloser is not finished" << endl;
+-        if(mpLoopCloser->isRunningGBA()){
+-            cout << "mpLoopCloser is running GBA" << endl;
+-            cout << "break anyway..." << endl;
+-            break;
+-        }*/
+-        /*usleep(5000);
+-    }*/
++    if(mpViewer) mpViewer->RequestFinish();
++    while(!mpLocalMapper->isFinished() || !mpLoopCloser->isFinished() ||
++          mpLoopCloser->isRunningGBA() || (mpViewer && !mpViewer->isFinished()))
++        usleep(5000);
++    if(mptLocalMapping && mptLocalMapping->joinable()) mptLocalMapping->join();
++    if(mptLoopClosing && mptLoopClosing->joinable()) mptLoopClosing->join();
++    if(mpViewer && mptViewer && mptViewer->joinable()) mptViewer->join();
+ 
+     if(!mStrSaveAtlasToFile.empty())
+     {
+@@ -624,6 +611,46 @@
+     }
+     f.close();
+     // cout << endl << "trajectory saved!" << endl;
++}
++
++bool System::GetCurrentDenseKeyFrame(DenseKeyFrame& out)
++{
++    KeyFrame* k = mpTracker->GetLastKeyFrame();
++    if(!k || k->mTimeStamp != mpTracker->mCurrentFrame.mTimeStamp) return false;
++    out = {k->mnId, k->mnFrameId, k->mTimeStamp, k->GetPoseInverse()};
++    return true;
++}
++
++System::DenseSnapshot System::GetDenseSnapshot()
++{
++    // Map/KeyFrame destruction on Reset is serialized by the calling owner
++    // thread. No SLAM pointer escapes this method. Do not hold Atlas lock while
++    // acquiring map-update locks: Tracking/LoopClosing take the opposite order.
++    DenseSnapshot out;
++    out.active_map = mpAtlas->GetCurrentMap()->GetId();
++    const auto maps = mpAtlas->GetAllMaps();
++    for(Map* map : maps) {
++        std::unique_lock<std::mutex> lock(map->mMutexMapUpdate);
++        if(map->IsBad()) continue;
++        DenseMap dm{map->GetId(), map->GetMapChangeIndex(), {}};
++        for(KeyFrame* k : map->GetAllKeyFrames()) {
++            if(k->isBad() || k->GetMap()!=map) continue;
++            dm.keyframes.push_back({k->mnId,k->mnFrameId,k->mTimeStamp,k->GetPoseInverse()});
++        }
++        std::sort(dm.keyframes.begin(),dm.keyframes.end(),
++                  [](const DenseKeyFrame& a,const DenseKeyFrame& b){return a.timestamp<b.timestamp;});
++        out.maps.push_back(std::move(dm));
++    }
++    // A merge may have changed the atlas while copying a different map. Reject
++    // such a snapshot instead of publishing duplicate/inconsistent memberships.
++    const auto after = mpAtlas->GetAllMaps();
++    if(maps!=after || out.active_map!=mpAtlas->GetCurrentMap()->GetId())
++        throw std::runtime_error("Dense snapshot deferred: atlas membership changed");
++    std::set<unsigned long> seen;
++    for(const auto& map : out.maps) for(const auto& k : map.keyframes)
++        if(!seen.insert(k.id).second)
++            throw std::runtime_error("Dense snapshot deferred: keyframe moved between maps");
++    return out;
+ }
+ 
+ void System::SaveKeyFrameTrajectoryTUM(const string &filename)
+@@ -1546,4 +1573,3 @@
+ }
+ 
+ } //namespace ORB_SLAM
+-
+--- a/src/Viewer.cc
++++ b/src/Viewer.cc
+@@ -184,7 +184,7 @@
+     pangolin::Var<bool> menuShowInertialGraph("menu.Show Inertial Graph",true,true);
+     pangolin::Var<bool> menuLocalizationMode("menu.Localization Mode",false,true);
+     pangolin::Var<bool> menuReset("menu.Reset",false,false);
+-    pangolin::Var<bool> menuStop("menu.Stop",false,false);
++    pangolin::Var<bool> menuStop("menu.Close Viewer",false,false);
+     pangolin::Var<bool> menuStepByStep("menu.Step By Step",false,true);  // false, true
+     pangolin::Var<bool> menuStep("menu.Step",false,false);
+ 
+@@ -356,15 +356,8 @@
+ 
+         if(menuStop)
+         {
+-            if(bLocalizationMode)
+-                mpSystem->DeactivateLocalizationMode();
+-
+-            // Stop all threads
+-            mpSystem->Shutdown();
+-
+-            // Save camera trajectory
+-            mpSystem->SaveTrajectoryEuRoC("CameraTrajectory.txt");
+-            mpSystem->SaveKeyFrameTrajectoryEuRoC("KeyFrameTrajectory.txt");
++            // The ROS process owns shutdown and recording. This only closes the viewer.
++            RequestFinish();
+             menuStop = false;
+         }
+ 
+@@ -376,7 +369,7 @@
+             }
+         }
+ 
+-        if(CheckFinish())
++        if(CheckFinish() || pangolin::ShouldQuit())
+             break;
+     }
+ 

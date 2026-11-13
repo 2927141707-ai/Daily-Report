@@ -1,0 +1,24 @@
+# Generated outputs and local data; keep modified source files trackable.
+**/__pycache__/
+*.pyc
+**/build/
+**/build_dense/
+**/install/
+**/log/
+**/logs/
+*.so
+*.so.*
+*.o
+*.log
+outputs/dense_runs/
+outputs/runs/
+outputs/reload_logs/
+work/orbslam3_base/
+work/integration_runs/
+work/mapper_service_tests/
+work/ORB_SLAM3_p06/Vocabulary/
+*.ply
+*.pcd
+.env
+.env.*
+**/.git-credentials

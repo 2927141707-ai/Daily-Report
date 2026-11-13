@@ -1,0 +1,50 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Global Options:
+    Background Color: 35; 35; 35
+    Fixed Frame: slam_map_0
+    Frame Rate: 20
+  Displays:
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Dense RGB-D Map
+      Enabled: true
+      Topic:
+        Value: /orb_slam3/dense_map
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Depth: 1
+      Color Transformer: RGB8
+      Position Transformer: XYZ
+      Style: Points
+      Size (Pixels): 2
+      Decay Time: 0
+    - Class: rviz_default_plugins/Path
+      Name: Optimized Keyframes
+      Enabled: true
+      Topic:
+        Value: /orb_slam3/keyframe_path
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        Depth: 1
+      Color: 255; 170; 0
+      Line Style: Lines
+      Line Width: 0.02
+    - Class: rviz_default_plugins/TF
+      Name: SLAM Camera Pose
+      Enabled: true
+      Show Names: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 4
+      Pitch: 0.4
+      Yaw: 0.8
+Window Geometry:
+  Width: 1200
+  Height: 800
