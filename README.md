@@ -25,7 +25,7 @@
 | [work/checks](work/checks) | 几何、队列、保存及ROS2集成验证程序 |
 | [SOURCE_MANIFEST.json](SOURCE_MANIFEST.json) | 原始提交编号、修改文件清单和SHA256校验值 |
 
-没有上传编译目录、动态库、词袋、数据集、扫描图像、PLY原始结果、运行日志或认证信息。原有README展示图保留。
+
 
 ## 如何使用这些修改文件
 
